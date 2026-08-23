@@ -27,9 +27,9 @@ jobs:
             }
           - {
               version: "19.07.9",
-              arch: "meson",
+              arch: "amlogic",
               subarch: "meson8b",
-              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 / OpenWrt 19.07)
+              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 正确路径)
             }
           - {
               version: "22.03.5",
