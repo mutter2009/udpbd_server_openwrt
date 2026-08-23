@@ -26,6 +26,12 @@ jobs:
               pkg_arch: "mipsel_24kc",
             }
           - {
+              version: "19.07.9",
+              arch: "meson",
+              subarch: "meson8b",
+              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 / OpenWrt 19.07)
+            }
+          - {
               version: "22.03.5",
               arch: "rockchip",
               subarch: "armv8",
@@ -81,12 +87,18 @@ jobs:
           mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
           cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
 
-      - name: Fix lseek64 build issue for newer C libraries
+      - name: Fix lseek64 build issue and enforce START=40
         run: |
           MAKEFILE_PATH="${{ env.WORK_DIR }}/package/udpbd-server/Makefile"
           if [ -f "$MAKEFILE_PATH" ]; then
             sed -i 's/TARGET_CXXFLAGS+=/TARGET_CXXFLAGS+= -D_LARGEFILE64_SOURCE -D_GNU_SOURCE /g' "$MAKEFILE_PATH" || true
           fi
+
+          # 强制将 init 启动文件中的 START=80 修改为 START=40
+          INIT_FILES=$(find ${{ env.WORK_DIR }}/package/udpbd-server/ -type f \( -name "*.init" -o -name "udpbd-server" \))
+          for f in $INIT_FILES; do
+            sed -i 's/START=80/START=40/g' "$f" || true
+          done
 
       - name: Compile the package (No feeds update)
         id: compile
