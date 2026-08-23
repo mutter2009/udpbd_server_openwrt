@@ -26,19 +26,19 @@ jobs:
               pkg_arch: "mipsel_24kc",
             }
           - {
-              version: "22.03.5",
+              version: "23.05.0",
               arch: "rockchip",
               subarch: "armv8",
               pkg_arch: "aarch64_cortex-a53",
             }
           - {
-              version: "22.03.5",
+              version: "23.05.0",
               arch: "ipq40xx",
               subarch: "generic",
               pkg_arch: "arm_cortex-a7_neon-vfpv4",
             }
           - {
-              version: "22.03.5",
+              version: "23.05.0",
               arch: "x86",
               subarch: "64",
               pkg_arch: "x86_64",
