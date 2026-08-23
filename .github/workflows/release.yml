@@ -1,3 +1,5 @@
+Workflow file for this run
+.github/workflows/release.yml at ef0971f
 name: Build OneThingCloud UDPBD IPK
 
 on:
@@ -16,14 +18,12 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf tar gzip
-
       - name: Compile UDPBD Binary
         run: |
           mkdir -p bin_out
           
           SRC_C=$(find . -maxdepth 3 -name "*.c" 2>/dev/null || true)
           SRC_CPP=$(find . -maxdepth 3 -name "*.cpp" -o -name "*.cc" 2>/dev/null || true)
-
           if [ -n "$SRC_CPP" ]; then
             arm-linux-gnueabihf-g++ -O2 -march=armv7-a -mfpu=vfpv4-d16 -mfloat-abi=hard \
               -D_LARGEFILE64_SOURCE -D_GNU_SOURCE $SRC_C $SRC_CPP -o bin_out/udpbd-server
@@ -34,17 +34,14 @@ jobs:
             echo "Error: No C/C++ source files found!"
             exit 1
           fi
-
       - name: Build Standard IPK Package
         run: |
           mkdir -p ipk_root/CONTROL
           mkdir -p ipk_root/usr/bin
           mkdir -p ipk_root/etc/init.d
-
           # 1. 复制二进制文件
           cp bin_out/udpbd-server ipk_root/usr/bin/
           chmod +x ipk_root/usr/bin/udpbd-server
-
           # 2. 生成启动脚本 (START=40)
           INIT_FILE=$(find . -name "*.init" -o -name "udpbd-server.init" 2>/dev/null | head -n 1)
           if [ -n "$INIT_FILE" ] && [ -f "$INIT_FILE" ]; then
@@ -53,6 +50,14 @@ jobs:
             cat << 'EOF' > ipk_root/etc/init.d/udpbd-server
 #!/bin/sh /etc/rc.common
 START=40
+ Check failure on line 55 in .github/workflows/release.yml
+
+
+GitHub Actions
+/ .github/workflows/release.yml
+Invalid workflow file
+
+You have an error in your yaml syntax on line 55
 STOP=10
 USE_PROCD=1
 
