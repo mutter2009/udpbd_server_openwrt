@@ -33,8 +33,8 @@ jobs:
             }
           - {
               version: "22.03.5",
-              arch: "ipq40xx",
-              subarch: "generic",
+              arch: "bcm27xx",
+              subarch: "bcm2710",
               pkg_arch: "arm_cortex-a7_neon-vfpv4",
             }
           - {
@@ -62,17 +62,12 @@ jobs:
           SDK_ARCH=${{ matrix.target.arch }}
           SDK_SUBARCH=${{ matrix.target.subarch }}
 
-          # 针对 ipq40xx 特殊处理正确的 GCC 版本号
-          if [ "${SDK_ARCH}" = "ipq40xx" ]; then
-            GCC_VERSION="11.3.0"
-          else
-            case ${SDK_VERSION} in
-              19.07.*) GCC_VERSION="7.5.0" ;;
-              22.03.*) GCC_VERSION="11.2.0" ;;
-              23.05.*) GCC_VERSION="12.3.0" ;;
-              *) GCC_VERSION="7.5.0" ;;
-            esac
-          fi
+          case ${SDK_VERSION} in
+            19.07.*) GCC_VERSION="7.5.0" ;;
+            22.03.*) GCC_VERSION="11.2.0" ;;
+            23.05.*) GCC_VERSION="12.3.0" ;;
+            *) GCC_VERSION="7.5.0" ;;
+          esac
 
           SDK_URL="https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.xz"
           echo "Downloading SDK from ${SDK_URL}"
