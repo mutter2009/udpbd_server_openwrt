@@ -1,7 +1,7 @@
-name: Build UDPBD for OneThingCloud
+name: Build OneThingCloud UDPBD IPK
 
 on:
-  workflow_dispatch: # 仅保留手动触发
+  workflow_dispatch:
 
 jobs:
   build-onecloud:
@@ -14,23 +14,25 @@ jobs:
 
       - name: Install Cross Compiler & Packaging Tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf tar gzip
+          sudo apt update
+          sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf tar gzip
 
       - name: Compile UDPBD Binary
         run: |
           mkdir -p bin_out
           
-          # 提取 C/C++ 源码，并针对玩客云 Cortex-A5 架构应用硬件加速编译参数
-          SRC_C=$(find . -maxdepth 3 -name "*.c")
-          SRC_CPP=$(find . -maxdepth 3 -name "*.cpp" -o -name "*.cc")
+          SRC_C=$(find . -maxdepth 3 -name "*.c" 2>/dev/null || true)
+          SRC_CPP=$(find . -maxdepth 3 -name "*.cpp" -o -name "*.cc" 2>/dev/null || true)
 
           if [ -n "$SRC_CPP" ]; then
             arm-linux-gnueabihf-g++ -O2 -march=armv7-a -mfpu=vfpv4-d16 -mfloat-abi=hard \
               -D_LARGEFILE64_SOURCE -D_GNU_SOURCE $SRC_C $SRC_CPP -o bin_out/udpbd-server
-          else
+          elif [ -n "$SRC_C" ]; then
             arm-linux-gnueabihf-gcc -O2 -march=armv7-a -mfpu=vfpv4-d16 -mfloat-abi=hard \
               -D_LARGEFILE64_SOURCE -D_GNU_SOURCE $SRC_C -o bin_out/udpbd-server
+          else
+            echo "Error: No C/C++ source files found!"
+            exit 1
           fi
 
       - name: Build Standard IPK Package
@@ -39,13 +41,13 @@ jobs:
           mkdir -p ipk_root/usr/bin
           mkdir -p ipk_root/etc/init.d
 
-          # 1. 复制二进制执行文件
+          # 1. 复制二进制文件
           cp bin_out/udpbd-server ipk_root/usr/bin/
           chmod +x ipk_root/usr/bin/udpbd-server
 
-          # 2. 生成启动脚本 (强制设定 START=40)
-          INIT_FILE=$(find . -name "*.init" -o -name "udpbd-server.init" | head -n 1)
-          if [ -f "$INIT_FILE" ]; then
+          # 2. 生成启动脚本 (START=40)
+          INIT_FILE=$(find . -name "*.init" -o -name "udpbd-server.init" 2>/dev/null | head -n 1)
+          if [ -n "$INIT_FILE" ] && [ -f "$INIT_FILE" ]; then
             cp "$INIT_FILE" ipk_root/etc/init.d/udpbd-server
           else
             cat << 'EOF' > ipk_root/etc/init.d/udpbd-server
@@ -65,7 +67,7 @@ EOF
           sed -i 's/START=80/START=40/g' ipk_root/etc/init.d/udpbd-server
           chmod +x ipk_root/etc/init.d/udpbd-server
 
-          # 3. 写入 OpenWrt 包描述
+          # 3. 写入 OpenWrt 包控制文件
           cat << 'EOF' > ipk_root/CONTROL/control
 Package: udpbd-server
 Version: 1.0-1
@@ -74,7 +76,7 @@ Maintainer: OpenWrt
 Description: UDPBD Server for PS2 OPL on OneThingCloud
 EOF
 
-          # 4. 打包为 .ipk 格式
+          # 4. 打包为 .ipk
           mkdir -p ipk_out
           cd ipk_root
           tar -czf ../control.tar.gz -C CONTROL .
