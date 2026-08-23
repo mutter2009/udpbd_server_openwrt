@@ -1,24 +1,136 @@
-name: Build OneThingCloud UDPBD IPK
+# Build OpenWrt UDPBD Server IPK for All Platforms
+name: Build OpenWrt UDPBD IPK
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 仅保留手动触发
 
 jobs:
-  build-onecloud:
-    name: Build OneThingCloud (S805 / Cortex-A5)
+  build:
+    name: Build IPK (${{ matrix.target.pkg_arch }})
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - {
+              version: "19.07.9",
+              arch: "ath79",
+              subarch: "generic",
+              pkg_arch: "mips_24kc",
+              is_s805: false
+            }
+          - {
+              version: "19.07.9",
+              arch: "ramips",
+              subarch: "mt76x8",
+              pkg_arch: "mipsel_24kc",
+              is_s805: false
+            }
+          - {
+              version: "custom",
+              arch: "amlogic",
+              subarch: "meson8b",
+              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805)
+              is_s805: true
+            }
+          - {
+              version: "22.03.5",
+              arch: "rockchip",
+              subarch: "armv8",
+              pkg_arch: "aarch64_cortex-a53",
+              is_s805: false
+            }
+          - {
+              version: "22.03.5",
+              arch: "bcm27xx",
+              subarch: "bcm2710",
+              pkg_arch: "arm_cortex-a7_neon-vfpv4",
+              is_s805: false
+            }
+          - {
+              version: "22.03.5",
+              arch: "x86",
+              subarch: "64",
+              pkg_arch: "x86_64",
+              is_s805: false
+            }
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Cross Compiler & Packaging Tools
+      # ------------------------------------------------------------------------
+      # 分流 1：常规硬件 - 使用 OpenWrt 官方 SDK 编译
+      # ------------------------------------------------------------------------
+      - name: Setup Python 2.x (Standard SDK)
+        if: ${{ !matrix.target.is_s805 }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python2
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
+
+      - name: Download and setup OpenWrt SDK (Standard SDK)
+        if: ${{ !matrix.target.is_s805 }}
+        run: |
+          cd ..
+          SDK_VERSION=${{ matrix.target.version }}
+          SDK_ARCH=${{ matrix.target.arch }}
+          SDK_SUBARCH=${{ matrix.target.subarch }}
+
+          case ${SDK_VERSION} in
+            19.07.*) GCC_VERSION="7.5.0" ;;
+            21.02.*) GCC_VERSION="8.4.0" ;;
+            22.03.*) GCC_VERSION="11.2.0" ;;
+            *) GCC_VERSION="7.5.0" ;;
+          esac
+
+          SDK_URL="https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.xz"
+          echo "Downloading SDK from ${SDK_URL}"
+          wget -q ${SDK_URL} -O openwrt-sdk.tar.xz
+          tar -xf openwrt-sdk.tar.xz
+          mv openwrt-sdk-* openwrt-sdk
+          echo "WORK_DIR=$(pwd)/openwrt-sdk" >> $GITHUB_ENV
+
+      - name: Compile Package with SDK (Standard SDK)
+        if: ${{ !matrix.target.is_s805 }}
+        id: compile_sdk
+        run: |
+          # 拷贝源码入 SDK
+          mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
+          cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
+
+          # 修复 lseek64 问题与设置 START=40
+          MAKEFILE_PATH="${{ env.WORK_DIR }}/package/udpbd-server/Makefile"
+          if [ -f "$MAKEFILE_PATH" ]; then
+            sed -i 's/TARGET_CXXFLAGS+=/TARGET_CXXFLAGS+= -D_LARGEFILE64_SOURCE -D_GNU_SOURCE /g' "$MAKEFILE_PATH" || true
+          fi
+          INIT_FILES=$(find ${{ env.WORK_DIR }}/package/udpbd-server/ -type f \( -name "*.init" -o -name "udpbd-server" \))
+          for f in $INIT_FILES; do
+            sed -i 's/START=80/START=40/g' "$f" || true
+          done
+
+          # 编译 IPK
+          cd ${{ env.WORK_DIR }}
+          make defconfig
+          make package/udpbd-server/compile V=s
+
+          IPK_PATH=$(find bin/packages -type f -name "udpbd-server_*.ipk")
+          echo "Found IPK: ${IPK_PATH}"
+          echo "final_ipk=${{ env.WORK_DIR }}/${IPK_PATH}" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------------
+      # 分流 2：玩客云 (S805) - 使用交叉编译工具直接打包
+      # ------------------------------------------------------------------------
+      - name: Build OneThingCloud IPK (S805 Special)
+        if: ${{ matrix.target.is_s805 }}
+        id: compile_s805
         run: |
           sudo apt update
           sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf tar gzip
 
-      - name: Compile UDPBD Binary
-        run: |
+          # 1. 编译二进制文件
           mkdir -p bin_out
           SRC_C=$(find . -maxdepth 3 -name "*.c" 2>/dev/null || true)
           SRC_CPP=$(find . -maxdepth 3 -name "*.cpp" -o -name "*.cc" 2>/dev/null || true)
@@ -26,13 +138,9 @@ jobs:
             arm-linux-gnueabihf-g++ -O2 -march=armv7-a -mfpu=vfpv4-d16 -mfloat-abi=hard -D_LARGEFILE64_SOURCE -D_GNU_SOURCE $SRC_C $SRC_CPP -o bin_out/udpbd-server
           elif [ -n "$SRC_C" ]; then
             arm-linux-gnueabihf-gcc -O2 -march=armv7-a -mfpu=vfpv4-d16 -mfloat-abi=hard -D_LARGEFILE64_SOURCE -D_GNU_SOURCE $SRC_C -o bin_out/udpbd-server
-          else
-            echo "Error: No C/C++ source files found!"
-            exit 1
           fi
 
-      - name: Build Standard IPK Package
-        run: |
+          # 2. 组装 IPK 目录结构
           mkdir -p ipk_root/CONTROL ipk_root/usr/bin ipk_root/etc/init.d
           cp bin_out/udpbd-server ipk_root/usr/bin/
           chmod +x ipk_root/usr/bin/udpbd-server
@@ -48,6 +156,7 @@ jobs:
 
           printf "Package: udpbd-server\nVersion: 1.0-1\nArchitecture: arm_cortex-a5_vfpv4\nMaintainer: OpenWrt\nDescription: UDPBD Server for PS2 OPL on OneThingCloud\n" > ipk_root/CONTROL/control
 
+          # 3. 打包 .ipk
           mkdir -p ipk_out
           cd ipk_root
           tar -czf ../control.tar.gz -C CONTROL .
@@ -57,8 +166,13 @@ jobs:
           echo "2.0" > debian-binary
           tar -czf ipk_out/udpbd-server_1.0-1_arm_cortex-a5_vfpv4.ipk debian-binary control.tar.gz data.tar.gz
 
-      - name: Upload OneThingCloud IPK File
+          echo "final_ipk=$(pwd)/ipk_out/udpbd-server_1.0-1_arm_cortex-a5_vfpv4.ipk" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------------
+      # 统一上传 Artifacts
+      # ------------------------------------------------------------------------
+      - name: Upload IPK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: udpbd-server-arm_cortex-a5_vfpv4
-          path: ipk_out/*.ipk
+          name: udpbd-server-${{ matrix.target.pkg_arch }}
+          path: ${{ steps.compile_sdk.outputs.final_ipk }}${{ steps.compile_s805.outputs.final_ipk }}
