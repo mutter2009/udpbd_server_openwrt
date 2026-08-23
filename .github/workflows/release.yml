@@ -26,8 +26,8 @@ jobs:
               pkg_arch: "mipsel_24kc",
             }
           - {
-              version: "19.07.9",
-              arch: "amlogic",
+              version: "21.02.7",
+              arch: "meson",
               subarch: "meson8b",
               pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 正确路径)
             }
@@ -70,6 +70,7 @@ jobs:
 
           case ${SDK_VERSION} in
             19.07.*) GCC_VERSION="7.5.0" ;;
+            21.02.*) GCC_VERSION="8.4.0" ;;
             22.03.*) GCC_VERSION="11.2.0" ;;
             23.05.*) GCC_VERSION="12.3.0" ;;
             *) GCC_VERSION="7.5.0" ;;
