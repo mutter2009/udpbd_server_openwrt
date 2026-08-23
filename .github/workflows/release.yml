@@ -1,46 +1,119 @@
-# Build UDPBD Server IPK and Binary (Standalone Toolchain)
-name: Build UDPBD Server
+# Build OpenWrt UDPBD Server IPK
+name: Build OpenWrt UDPBD IPK
 
 on:
   workflow_dispatch: # 仅保留手动触发
 
 jobs:
-  build-onecloud:
-    name: Build OneThingCloud (S805 / ARM32)
+  build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - {
+              version: "19.07.9",
+              arch: "ath79",
+              subarch: "generic",
+              pkg_arch: "mips_24kc",
+            }
+          - {
+              version: "19.07.9",
+              arch: "ramips",
+              subarch: "mt76x8",
+              pkg_arch: "mipsel_24kc",
+            }
+          - {
+              version: "23.05.5",
+              arch: "amlogic",
+              subarch: "meson8b",
+              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 / OpenWrt 23.05 正确官方路径)
+            }
+          - {
+              version: "22.03.5",
+              arch: "rockchip",
+              subarch: "armv8",
+              pkg_arch: "aarch64_cortex-a53",
+            }
+          - {
+              version: "22.03.5",
+              arch: "bcm27xx",
+              subarch: "bcm2710",
+              pkg_arch: "arm_cortex-a7_neon-vfpv4",
+            }
+          - {
+              version: "22.03.5",
+              arch: "x86",
+              subarch: "64",
+              pkg_arch: "x86_64",
+            }
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install ARM Cross-Compiler
+      - name: Setup Python 2.x
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt-get install -y python2
+          sudo ln -sf /usr/bin/python2 /usr/bin/python
+          python --version
 
-      - name: Modify START=40 and CXXFLAGS
+      - name: Download and setup OpenWrt SDK
         run: |
+          cd ..
+          SDK_VERSION=${{ matrix.target.version }}
+          SDK_ARCH=${{ matrix.target.arch }}
+          SDK_SUBARCH=${{ matrix.target.subarch }}
+
+          case ${SDK_VERSION} in
+            19.07.*) GCC_VERSION="7.5.0" ;;
+            21.02.*) GCC_VERSION="8.4.0" ;;
+            22.03.*) GCC_VERSION="11.2.0" ;;
+            23.05.*) GCC_VERSION="12.3.0" ;;
+            *) GCC_VERSION="7.5.0" ;;
+          esac
+
+          SDK_URL="https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.xz"
+          echo "Downloading SDK from ${SDK_URL}"
+          wget -q ${SDK_URL} -O openwrt-sdk.tar.xz
+          tar -xf openwrt-sdk.tar.xz
+          mv openwrt-sdk-* openwrt-sdk
+          echo "WORK_DIR=$(pwd)/openwrt-sdk" >> $GITHUB_ENV
+
+      - name: Install package sources into SDK
+        run: |
+          mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
+          cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
+
+      - name: Fix lseek64 build issue and enforce START=40
+        run: |
+          MAKEFILE_PATH="${{ env.WORK_DIR }}/package/udpbd-server/Makefile"
+          if [ -f "$MAKEFILE_PATH" ]; then
+            sed -i 's/TARGET_CXXFLAGS+=/TARGET_CXXFLAGS+= -D_LARGEFILE64_SOURCE -D_GNU_SOURCE /g' "$MAKEFILE_PATH" || true
+          fi
+
           # 强制将 init 启动文件中的 START=80 修改为 START=40
-          INIT_FILES=$(find . -type f \( -name "*.init" -o -name "udpbd-server" \))
+          INIT_FILES=$(find ${{ env.WORK_DIR }}/package/udpbd-server/ -type f \( -name "*.init" -o -name "udpbd-server" \))
           for f in $INIT_FILES; do
             sed -i 's/START=80/START=40/g' "$f" || true
           done
 
-      - name: Compile Binary for OneThingCloud
+      - name: Compile the package (No feeds update)
+        id: compile
         run: |
-          mkdir -p build_out
-          # 使用 32位 ARM 交叉编译器直接编译二进制文件
-          if [ -f "src/Makefile" ] || [ -f "Makefile" ]; then
-            make CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ \
-                 CFLAGS="-O2 -D_LARGEFILE64_SOURCE -D_GNU_SOURCE" \
-                 CXXFLAGS="-O2 -D_LARGEFILE64_SOURCE -D_GNU_SOURCE" || true
-          fi
-          
-          # 寻找编译出的二进制文件并备份
-          find . -maxdepth 3 -type f -executable -name "udpbd-server*" -exec cp {} build_out/ \;
+          cd ${{ env.WORK_DIR }}
+          make defconfig
+          make package/udpbd-server/compile V=s
 
-      - name: Upload OneThingCloud Binary
+          IPK_PATH=$(find bin/packages -type f -name "udpbd-server_*.ipk")
+          echo "Found IPK: ${IPK_PATH}"
+          echo "ipk_path=${IPK_PATH}" >> $GITHUB_OUTPUT
+
+      - name: Upload IPK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: udpbd-server-onethingcloud-s805
-          path: build_out/
+          name: udpbd-server-${{ matrix.target.pkg_arch }}
+          path: ${{ env.WORK_DIR }}/${{ steps.compile.outputs.ipk_path }}
