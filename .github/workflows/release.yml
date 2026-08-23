@@ -26,10 +26,10 @@ jobs:
               pkg_arch: "mipsel_24kc",
             }
           - {
-              version: "21.02.7",
-              arch: "amlogic",
+              version: "22.03.5",
+              arch: "meson",
               subarch: "meson8b",
-              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 修正为 amlogic 路径)
+              pkg_arch: "arm_cortex-a5_vfpv4", # 玩客云专用 (S805 / OpenWrt 22.03)
             }
           - {
               version: "22.03.5",
