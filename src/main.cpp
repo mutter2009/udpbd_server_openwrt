@@ -126,7 +126,10 @@ public:
 
             struct SUDPBDv2_Header *hdr = (struct SUDPBDv2_Header *)buf;
 
-            switch (hdr->cmd) {
+            // 核心修复：解析 PS2 传来的 cmd 命令时强制转换字节序
+            uint16_t cmd = le16toh(hdr->cmd);
+
+            switch (cmd) {
                 case UDPBD_CMD_INFO:
                     handle_cmd_info(si_other, (struct SUDPBDv2_InfoRequest *)buf);
                     break;
@@ -140,7 +143,7 @@ public:
                     handle_cmd_write_rdma(si_other, (struct SUDPBDv2_RDMA *)buf);
                     break;
                 default:
-                    printf("Invalid cmd: 0x%x\n", hdr->cmd);
+                    printf("Invalid cmd: 0x%x (raw: 0x%x)\n", cmd, hdr->cmd);
             };
         }
     }
@@ -183,11 +186,11 @@ private:
 
         printf("\nUDPBD_CMD_INFO from %s\n", str);
 
-        reply.hdr.cmd      = UDPBD_CMD_INFO_REPLY;
-        reply.hdr.cmdid    = request->hdr.cmdid;
-        reply.hdr.cmdpkt   = 1;
+        // 核心修复：回复包必须转换回小端序
+        reply.hdr.cmd      = htole16(UDPBD_CMD_INFO_REPLY);
+        reply.hdr.cmdid    = request->hdr.cmdid; // 保持原原样传递
+        reply.hdr.cmdpkt   = htole16(1);
         
-        // Convert integers to Little-Endian for PS2
         reply.sector_size  = htole32(_bd.get_sector_size());
         reply.sector_count = htole32(_bd.get_sector_count());
 
@@ -204,9 +207,9 @@ private:
 
         set_block_shift_sectors(sector_count);
 
-        reply.hdr.cmd        = UDPBD_CMD_READ_RDMA;
+        // 核心修复：回复给 PS2 的 RDMA 报头转换回小端序
+        reply.hdr.cmd        = htole16(UDPBD_CMD_READ_RDMA);
         reply.hdr.cmdid      = request->hdr.cmdid;
-        reply.hdr.cmdpkt     = 1;
         reply.bt.block_shift = _block_shift;
 
         uint32_t blocks_left = sector_count * _blocks_per_sector;
@@ -215,7 +218,9 @@ private:
 
         _bd.seek(sector_nr);
 
+        uint16_t pkt_count = 1;
         while (blocks_left > 0) {
+            reply.hdr.cmdpkt     = htole16(pkt_count);
             reply.bt.block_count = (blocks_left > _blocks_per_packet) ? _blocks_per_packet : blocks_left;
             blocks_left -= reply.bt.block_count;
 
@@ -224,7 +229,7 @@ private:
             if (SENDTO(s, &reply, sizeof(struct SUDPBDv2_Header) + 4 + (reply.bt.block_count * _block_size), 0, (struct sockaddr*) &si_other, sizeof(si_other)) == -1) {
                 throw runtime_error("sendto");
             }
-            reply.hdr.cmdpkt++;
+            pkt_count++;
         }
     }
 
@@ -245,9 +250,9 @@ private:
 
         if(_write_size_left == 0) {
             struct SUDPBDv2_WriteDone reply;
-            reply.hdr.cmd      = UDPBD_CMD_WRITE_DONE;
+            reply.hdr.cmd      = htole16(UDPBD_CMD_WRITE_DONE);
             reply.hdr.cmdid    = request->hdr.cmdid;
-            reply.hdr.cmdpkt   = request->hdr.cmdid + 1;
+            reply.hdr.cmdpkt   = htole16(le16toh(request->hdr.cmdid) + 1);
             reply.result       = 0;
 
             if (SENDTO(s, &reply, sizeof(reply), 0, (struct sockaddr*) &si_other, sizeof(si_other)) == -1) {
