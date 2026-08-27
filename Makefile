@@ -31,7 +31,7 @@ define Build/Compile
 		-I$(PKG_BUILD_DIR) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
 		$(PKG_BUILD_DIR)/main.cpp \
-		$(TARGET_LDFLAGS) -static-libstdc++ -static-libgcc
+		$(TARGET_LDFLAGS) -static-libstdc++ -static-libgcc -lgcc_eh
 endef
 
 define Package/udpbd-server/install
