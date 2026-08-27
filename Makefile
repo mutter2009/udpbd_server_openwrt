@@ -9,12 +9,12 @@ include $(INCLUDE_DIR)/package.mk
 define Package/udpbd-server
 	SECTION:=net
 	CATEGORY:=Network
-	TITLE:=UDP Block Device Server (Big-Endian Fixed)
+	TITLE:=UDP Block Device Server (Big-Endian MIPS)
 	DEPENDS:=+libstdcpp
 endef
 
 define Package/udpbd-server/description
-	UDP Block Device (UDPBD) server for OpenWrt (Compatible with Big-Endian & Little-Endian devices).
+	UDP Block Device (UDPBD) server for OpenWrt (Big-Endian MIPS fixed).
 endef
 
 define Build/Configure
@@ -23,9 +23,10 @@ endef
 define Build/Compile
 	$(TARGET_CXX) $(TARGET_CXXFLAGS) $(TARGET_CPPFLAGS) \
 		-D_GNU_SOURCE \
+		-I$(PKG_BUILD_DIR)/src \
 		-I$(PKG_BUILD_DIR) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
-		$(PKG_BUILD_DIR)/src/main.cpp \
+		$(firstword $(wildcard $(PKG_BUILD_DIR)/src/main.cpp $(PKG_BUILD_DIR)/main.cpp)) \
 		$(TARGET_LDFLAGS) $(TARGET_LDFLAGS_STATIC)
 endef
 
