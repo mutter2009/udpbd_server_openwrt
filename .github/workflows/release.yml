@@ -1,4 +1,3 @@
-# Build and Release OpenWrt UDPBD Server IPK (Minimal)
 name: Build and Release OpenWrt UDPBD IPK
 
 on:
@@ -14,6 +13,21 @@ jobs:
     strategy:
       matrix:
         target:
+          # 品胜经典大端序 (Big-Endian MIPS) - ar71xx
+          - {
+              version: "19.07.10",
+              arch: "ar71xx",
+              subarch: "generic",
+              pkg_arch: "mips_24kc",
+            }
+          # 较新大端序 (Big-Endian MIPS) - ath79
+          - {
+              version: "22.03.5",
+              arch: "ath79",
+              subarch: "generic",
+              pkg_arch: "mips_24kc",
+            }
+          # 小端序 (Little-Endian MIPS) - ramips (如 MT7628)
           - {
               version: "19.07.9",
               arch: "ramips",
@@ -29,9 +43,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python2
-          # Create symlink so 'python' command works
           sudo ln -sf /usr/bin/python2 /usr/bin/python
-          python --version
 
       - name: Download and setup OpenWrt SDK
         run: |
@@ -59,52 +71,23 @@ jobs:
           mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
           cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
 
-      - name: Compile the package (No feeds update)
+      - name: Compile the package
         id: compile
         run: |
           cd ${{ env.WORK_DIR }}
-
-          # Skip feed updates - use what's in the SDK
-          echo "Skipping feed updates due to server issues..."
-
-          # Basic configuration
           make defconfig
-
-          # Compile UDPBD server package directly
           make package/udpbd-server/compile V=s
 
-          # Find the generated IPK file
           IPK_PATH=$(find bin/packages -type f -name "udpbd-server_*.ipk")
           echo "Found IPK: ${IPK_PATH}"
           echo "ipk_path=${IPK_PATH}" >> $GITHUB_OUTPUT
 
-      - name: Upload IPK as artifact
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v4
-        with:
-          name: udpbd-server-ipk-${{ matrix.target.version }}-${{ matrix.target.pkg_arch }}
-          path: ${{ env.WORK_DIR }}/${{ steps.compile.outputs.ipk_path }}
-
       - name: Create GitHub Release and Upload Asset
-        if: "startsWith(github.ref, 'refs/tags/')"
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: ${{ env.WORK_DIR }}/${{ steps.compile.outputs.ipk_path }}
           tag_name: ${{ github.ref_name }}
           name: UDPBD Server ${{ github.ref_name }}
-          body: |
-            ## OpenWrt UDPBD Server Release ${{ github.ref_name }}
-
-            Cross-compiled IPK packages for OpenWrt targets.
-
-            ### Installation:
-            ```bash
-            scp udpbd-server_*.ipk root@your-router:/tmp/
-            opkg install /tmp/udpbd-server_*.ipk
-            udpbd-server /dev/sda1
-            ```
-
-            Built from commit: ${{ github.sha }}
           draft: false
           prerelease: false
