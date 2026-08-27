@@ -17,16 +17,20 @@ define Package/udpbd-server/description
 	UDP Block Device (UDPBD) server for OpenWrt (Big-Endian MIPS fixed).
 endef
 
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || $(CP) ./* $(PKG_BUILD_DIR)/ 2>/dev/null || true
+endef
+
 define Build/Configure
 endef
 
 define Build/Compile
 	$(TARGET_CXX) $(TARGET_CXXFLAGS) $(TARGET_CPPFLAGS) \
 		-D_GNU_SOURCE \
-		-I$(PKG_BUILD_DIR)/src \
 		-I$(PKG_BUILD_DIR) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
-		$(firstword $(wildcard $(PKG_BUILD_DIR)/src/main.cpp $(PKG_BUILD_DIR)/main.cpp)) \
+		$(PKG_BUILD_DIR)/main.cpp \
 		$(TARGET_LDFLAGS) $(TARGET_LDFLAGS_STATIC)
 endef
 
@@ -35,10 +39,10 @@ define Package/udpbd-server/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/udpbd-server $(1)/usr/bin/
 	
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/udpbd-server.init $(1)/etc/init.d/udpbd-server
+	$(INSTALL_BIN) ./files/udpbd-server.init $(1)/etc/init.d/udpbd-server 2>/dev/null || true
 	
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/udpbd-server.config $(1)/etc/config/udpbd-server
+	$(INSTALL_CONF) ./files/udpbd-server.config $(1)/etc/config/udpbd-server 2>/dev/null || true
 endef
 
 $(eval $(call BuildPackage,udpbd-server))
