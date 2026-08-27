@@ -10,7 +10,7 @@ define Package/udpbd-server
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=UDP Block Device Server (Big-Endian MIPS)
-	DEPENDS:=+libstdcpp
+	DEPENDS:=
 endef
 
 define Package/udpbd-server/description
