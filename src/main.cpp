@@ -28,6 +28,25 @@
 
 using namespace std;
 
+// 辅助位运算函数：拼装 OPL v2 报头 (cmd:5bit, cmdid:3bit, cmdpkt:8bit)
+static inline uint16_t pack_hdr(uint8_t cmd, uint8_t cmdid, uint8_t cmdpkt) {
+    uint16_t val = (cmd & 0x1F) | ((cmdid & 0x07) << 5) | ((cmdpkt & 0xFF) << 8);
+    return htole16(val);
+}
+
+static inline void unpack_hdr(uint16_t raw_cmd16, uint8_t *cmd, uint8_t *cmdid, uint8_t *cmdpkt) {
+    uint16_t val = le16toh(raw_cmd16);
+    if (cmd)    *cmd    = val & 0x1F;
+    if (cmdid)  *cmdid  = (val >> 5) & 0x07;
+    if (cmdpkt) *cmdpkt = (val >> 8) & 0xFF;
+}
+
+// 辅助位运算函数：拼装 RDMA block_type (shift:4bit, count:9bit, spare:19bit)
+static inline uint32_t pack_bt(uint8_t shift, uint16_t count) {
+    uint32_t val = (shift & 0x0F) | ((count & 0x01FF) << 4);
+    return htole32(val);
+}
+
 class CBlockDevice
 {
 public:
@@ -45,7 +64,7 @@ public:
 
         printf("Opened '%s' as Block Device\n", sFileName);
         printf(" - %s\n", _read_only ? "read-only" : "read/write");
-        printf(" - size = %ldMB / %ldMiB\n", _fsize / (1000*1000), _fsize / (1024*1024));
+        printf(" - size = %ldMB / %ldMiB\n", (long)(_fsize / (1000*1000)), (long)(_fsize / (1024*1024)));
     }
 
     ~CBlockDevice() {
@@ -70,7 +89,7 @@ public:
     }
 
     uint32_t get_sector_size()  {return 512;}
-    uint32_t get_sector_count() {return _fsize/512;}
+    uint32_t get_sector_count() {return _fsize / 512;}
 
 private:
     int _fp;
@@ -100,7 +119,6 @@ public:
         int broadcastEnable=1;
         SETSOCKOPT(s, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
         
-        // Optimize socket buffer for router performance
         int rcvbuf = 256 * 1024;
         SETSOCKOPT(s, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
     }
@@ -114,7 +132,6 @@ public:
         socklen_t slen = sizeof(si_other);
         int recv_len;
         
-        // Alignment buffer for MIPS CPU
         uint8_t buf[BUFLEN] __attribute__((aligned(4)));
 
         printf("Server running on port %d (0x%x)\n", UDPBD_PORT, UDPBD_PORT);
@@ -125,32 +142,31 @@ public:
             }
 
             struct SUDPBDv2_Header *hdr = (struct SUDPBDv2_Header *)buf;
-
-            // 核心修复：解析 PS2 传来的 cmd 命令时强制转换字节序
-            uint16_t cmd = le16toh(hdr->cmd);
+            uint8_t cmd, cmdid, cmdpkt;
+            unpack_hdr(hdr->cmd16, &cmd, &cmdid, &cmdpkt);
 
             switch (cmd) {
                 case UDPBD_CMD_INFO:
-                    handle_cmd_info(si_other, (struct SUDPBDv2_InfoRequest *)buf);
+                    handle_cmd_info(si_other, (struct SUDPBDv2_InfoRequest *)buf, cmdid);
                     break;
                 case UDPBD_CMD_READ:
-                    handle_cmd_read(si_other, (struct SUDPBDv2_RWRequest *)buf);
+                    handle_cmd_read(si_other, (struct SUDPBDv2_RWRequest *)buf, cmdid);
                     break;
                 case UDPBD_CMD_WRITE:
-                    handle_cmd_write(si_other, (struct SUDPBDv2_RWRequest *)buf);
+                    handle_cmd_write(si_other, (struct SUDPBDv2_RWRequest *)buf, cmdid);
                     break;
                 case UDPBD_CMD_WRITE_RDMA:
-                    handle_cmd_write_rdma(si_other, (struct SUDPBDv2_RDMA *)buf);
+                    handle_cmd_write_rdma(si_other, (struct SUDPBDv2_RDMA *)buf, cmdid);
                     break;
                 default:
-                    printf("Invalid cmd: 0x%x (raw: 0x%x)\n", cmd, hdr->cmd);
+                    printf("Invalid cmd: 0x%x\n", cmd);
             };
         }
     }
 
 private:
     void print_stats() {
-        printf("Total read: %ld KiB, total write: %ld KiB\r", (long)_total_read/1024, (long)_total_write/1024);
+        printf("Total read: %ld KiB, total write: %ld KiB\r", (long)(_total_read/1024), (long)(_total_write/1024));
         fflush(stdout);
     }
 
@@ -179,18 +195,16 @@ private:
         set_block_shift(shift);
     }
 
-    void handle_cmd_info(struct sockaddr_in &si_other, struct SUDPBDv2_InfoRequest *request) {
+    void handle_cmd_info(struct sockaddr_in &si_other, struct SUDPBDv2_InfoRequest *request, uint8_t cmdid) {
         struct SUDPBDv2_InfoReply reply;
+        memset(&reply, 0, sizeof(reply));
+
         char str[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &si_other.sin_addr, str, INET_ADDRSTRLEN);
-
         printf("\nUDPBD_CMD_INFO from %s\n", str);
 
-        // 核心修复：回复包必须转换回小端序
-        reply.hdr.cmd      = htole16(UDPBD_CMD_INFO_REPLY);
-        reply.hdr.cmdid    = request->hdr.cmdid; // 保持原原样传递
-        reply.hdr.cmdpkt   = htole16(1);
-        
+        // 拼接打包 Header，确保字节序在 MIPS 下完全正确
+        reply.hdr.cmd16    = pack_hdr(UDPBD_CMD_INFO_REPLY, cmdid, 1);
         reply.sector_size  = htole32(_bd.get_sector_size());
         reply.sector_count = htole32(_bd.get_sector_count());
 
@@ -199,18 +213,13 @@ private:
         }
     }
 
-    void handle_cmd_read(struct sockaddr_in &si_other, struct SUDPBDv2_RWRequest *request) {
+    void handle_cmd_read(struct sockaddr_in &si_other, struct SUDPBDv2_RWRequest *request, uint8_t cmdid) {
         struct SUDPBDv2_RDMA reply;
 
         uint32_t sector_nr = le32toh(request->sector_nr);
         uint16_t sector_count = le16toh(request->sector_count);
 
         set_block_shift_sectors(sector_count);
-
-        // 核心修复：回复给 PS2 的 RDMA 报头转换回小端序
-        reply.hdr.cmd        = htole16(UDPBD_CMD_READ_RDMA);
-        reply.hdr.cmdid      = request->hdr.cmdid;
-        reply.bt.block_shift = _block_shift;
 
         uint32_t blocks_left = sector_count * _blocks_per_sector;
         _total_read += blocks_left * _block_size;
@@ -220,20 +229,23 @@ private:
 
         uint16_t pkt_count = 1;
         while (blocks_left > 0) {
-            reply.hdr.cmdpkt     = htole16(pkt_count);
-            reply.bt.block_count = (blocks_left > _blocks_per_packet) ? _blocks_per_packet : blocks_left;
-            blocks_left -= reply.bt.block_count;
+            uint32_t cur_blocks = (blocks_left > _blocks_per_packet) ? _blocks_per_packet : blocks_left;
+            
+            reply.hdr.cmd16 = pack_hdr(UDPBD_CMD_READ_RDMA, cmdid, pkt_count);
+            reply.bt.bt     = pack_bt(_block_shift, cur_blocks);
 
-            _bd.read(reply.data, reply.bt.block_count * _block_size);
+            blocks_left -= cur_blocks;
 
-            if (SENDTO(s, &reply, sizeof(struct SUDPBDv2_Header) + 4 + (reply.bt.block_count * _block_size), 0, (struct sockaddr*) &si_other, sizeof(si_other)) == -1) {
+            _bd.read(reply.data, cur_blocks * _block_size);
+
+            if (SENDTO(s, &reply, sizeof(struct SUDPBDv2_Header) + sizeof(struct SUDPBDv2_BlockType) + (cur_blocks * _block_size), 0, (struct sockaddr*) &si_other, sizeof(si_other)) == -1) {
                 throw runtime_error("sendto");
             }
             pkt_count++;
         }
     }
 
-    void handle_cmd_write(struct sockaddr_in &si_other, struct SUDPBDv2_RWRequest *request) {
+    void handle_cmd_write(struct sockaddr_in &si_other, struct SUDPBDv2_RWRequest *request, uint8_t cmdid) {
         uint32_t sector_nr = le32toh(request->sector_nr);
         uint16_t sector_count = le16toh(request->sector_count);
 
@@ -243,17 +255,20 @@ private:
         print_stats();
     }
 
-    void handle_cmd_write_rdma(struct sockaddr_in &si_other, struct SUDPBDv2_RDMA *request) {
-        size_t size = request->bt.block_count * (1 << (request->bt.block_shift + 2));
+    void handle_cmd_write_rdma(struct sockaddr_in &si_other, struct SUDPBDv2_RDMA *request, uint8_t cmdid) {
+        uint32_t raw_bt = le32toh(request->bt.bt);
+        uint8_t shift = raw_bt & 0x0F;
+        uint16_t block_count = (raw_bt >> 4) & 0x01FF;
+
+        size_t size = block_count * (1 << (shift + 2));
         _bd.write(request->data, size);
         _write_size_left -= size;
 
         if(_write_size_left == 0) {
             struct SUDPBDv2_WriteDone reply;
-            reply.hdr.cmd      = htole16(UDPBD_CMD_WRITE_DONE);
-            reply.hdr.cmdid    = request->hdr.cmdid;
-            reply.hdr.cmdpkt   = htole16(le16toh(request->hdr.cmdid) + 1);
-            reply.result       = 0;
+            memset(&reply, 0, sizeof(reply));
+            reply.hdr.cmd16 = pack_hdr(UDPBD_CMD_WRITE_DONE, cmdid, cmdid + 1);
+            reply.result    = 0;
 
             if (SENDTO(s, &reply, sizeof(reply), 0, (struct sockaddr*) &si_other, sizeof(si_other)) == -1) {
                 throw runtime_error("sendto");
