@@ -27,14 +27,14 @@ jobs:
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 2. 玩客云 OpenWrt / 32位系统 (ARMv7 Little-Endian - S805 芯片)
+          # 2. 玩客云 OpenWrt / 32位系统 (ARMv7 Little-Endian) - 修复为 armvirt/32 SDK
           - {
               version: "22.03.5",
-              arch: "meson",
-              subarch: "meson8b",
-              pkg_arch: "arm_cortex-a5_vfpv4",
+              arch: "armvirt",
+              subarch: "32",
+              pkg_arch: "arm_cortex-a15_neon-vfpv4",
             }
-          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64) - 修复为 armvirt/64 SDK
+          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64) - armvirt/64 SDK
           - {
               version: "22.03.5",
               arch: "armvirt",
