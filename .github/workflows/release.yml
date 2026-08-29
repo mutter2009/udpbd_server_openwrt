@@ -1,8 +1,13 @@
-# Build and Release OpenWrt UDPBD Server IPK (Big-Endian Only)
+# Build and Release OpenWrt & Linux UDPBD IPK (Multi-Arch)
 name: Build and Release OpenWrt UDPBD IPK
 
 on:
   workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Run with debug logging'
+        required: false
+        default: 'false'
   push:
     tags:
       - "v*.*.*"
@@ -15,19 +20,26 @@ jobs:
     strategy:
       matrix:
         target:
-          # 品胜经典大端序 (Big-Endian MIPS) - ar71xx (如 AR9331)
+          # 1. 品胜经典大端路由器 (MIPS Big-Endian - AR9331 等)
           - {
               version: "19.07.10",
               arch: "ar71xx",
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 较新大端序 (Big-Endian MIPS) - ath79
+          # 2. 玩客云 OpenWrt / 32位系统 (ARMv7 Little-Endian - S805 芯片)
           - {
               version: "22.03.5",
-              arch: "ath79",
-              subarch: "generic",
-              pkg_arch: "mips_24kc",
+              arch: "meson",
+              subarch: "meson8b",
+              pkg_arch: "arm_cortex-a5_vfpv4",
+            }
+          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64)
+          - {
+              version: "22.03.5",
+              arch: "armsr",
+              subarch: "armv8",
+              pkg_arch: "aarch64_generic",
             }
 
     steps:
@@ -37,8 +49,10 @@ jobs:
       - name: Setup Python 2.x
         run: |
           sudo apt-get update
-          sudo apt-get install -y python2
-          sudo ln -sf /usr/bin/python2 /usr/bin/python
+          sudo apt-get install -y python2 || true
+          if [ -f /usr/bin/python2 ]; then
+            sudo ln -sf /usr/bin/python2 /usr/bin/python
+          fi
 
       - name: Download and setup OpenWrt SDK
         run: |
@@ -50,12 +64,12 @@ jobs:
           case ${SDK_VERSION} in
             19.07.*) GCC_VERSION="7.5.0" ;;
             22.03.*) GCC_VERSION="11.2.0" ;;
-            *) GCC_VERSION="7.5.0" ;;
+            *) GCC_VERSION="11.2.0" ;;
           esac
 
           SDK_URL="https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.xz"
           echo "Downloading SDK from ${SDK_URL}"
-          wget -q ${SDK_URL} -O openwrt-sdk.tar.xz
+          wget -q ${SDK_URL} -O openwrt-sdk.tar.xz || wget -q https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.bz2 -O openwrt-sdk.tar.xz
           tar -xf openwrt-sdk.tar.xz
           mv openwrt-sdk-* openwrt-sdk
           echo "WORK_DIR=$(pwd)/openwrt-sdk" >> $GITHUB_ENV
@@ -72,22 +86,27 @@ jobs:
           make defconfig
           make package/udpbd-server/compile V=s
 
-          IPK_PATH=$(find bin/packages -type f -name "udpbd-server_*.ipk")
-          echo "Found IPK: ${IPK_PATH}"
-          echo "ipk_path=${IPK_PATH}" >> $GITHUB_OUTPUT
+          IPK_PATH=$(find bin/packages -type f -name "udpbd-server_*.ipk" | head -n 1)
+          BIN_PATH=$(find build_dir -type f -name "udpbd-server" | head -n 1)
 
-      - name: Upload IPK as Artifact
+          mkdir -p release_files
+          cp ${IPK_PATH} release_files/udpbd-server_${{ matrix.target.pkg_arch }}.ipk
+          if [ -f "$BIN_PATH" ]; then
+            cp ${BIN_PATH} release_files/udpbd-server_${{ matrix.target.pkg_arch }}
+          fi
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: udpbd-server-${{ matrix.target.arch }}-${{ matrix.target.pkg_arch }}
-          path: ${{ env.WORK_DIR }}/${{ steps.compile.outputs.ipk_path }}
+          name: udpbd-server-${{ matrix.target.pkg_arch }}
+          path: ${{ env.WORK_DIR }}/release_files/*
 
       - name: Create GitHub Release and Upload Asset
         if: "startsWith(github.ref, 'refs/tags/')"
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: ${{ env.WORK_DIR }}/${{ steps.compile.outputs.ipk_path }}
+          files: ${{ env.WORK_DIR }}/release_files/*
           tag_name: ${{ github.ref_name }}
           name: UDPBD Server ${{ github.ref_name }}
           draft: false
