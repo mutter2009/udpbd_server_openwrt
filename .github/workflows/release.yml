@@ -27,11 +27,11 @@ jobs:
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 2. 玩客云 OpenWrt / 32位系统 (ARM32 Little-Endian - 修正 SDK 路径为 19.07.10 meson)
+          # 2. 玩客云 OpenWrt / 32位系统 (ARM32 S805 - 修正子路径为 generic)
           - {
               version: "19.07.10",
               arch: "meson",
-              subarch: "meson8b",
+              subarch: "generic",
               pkg_arch: "arm_cortex-a5_vfpv4",
             }
           # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64)
