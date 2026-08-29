@@ -9,12 +9,12 @@ include $(INCLUDE_DIR)/package.mk
 define Package/udpbd-server
 	SECTION:=net
 	CATEGORY:=Network
-	TITLE:=UDP Block Device Server (Big-Endian MIPS)
+	TITLE:=UDP Block Device Server (Multi-Arch Fixed)
 	DEPENDS:=
 endef
 
 define Package/udpbd-server/description
-	UDP Block Device (UDPBD) server for OpenWrt (Big-Endian MIPS fixed).
+	UDP Block Device (UDPBD) server with Bit-field endianness fixes for OpenWrt & Armbian.
 endef
 
 define Build/Prepare
