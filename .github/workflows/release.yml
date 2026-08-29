@@ -27,12 +27,12 @@ jobs:
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 2. 玩客云 OpenWrt / 32位系统 (ARMv7 Little-Endian) - 修正为 23.05.0 armvirt/32 SDK
+          # 2. 玩客云 / 32位 ARM (ARMv7 Little-Endian) - 修正为标准绝对存在的 19.07.10 armvirt/generic SDK
           - {
-              version: "23.05.0",
+              version: "19.07.10",
               arch: "armvirt",
-              subarch: "32",
-              pkg_arch: "arm_cortex-a7_neon-vfpv4",
+              subarch: "generic",
+              pkg_arch: "arm_cortex-a15_neon-vfpv4",
             }
           # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64) - 22.03.5 armvirt/64 SDK
           - {
@@ -64,7 +64,6 @@ jobs:
           case ${SDK_VERSION} in
             19.07.*) GCC_VERSION="7.5.0" ;;
             22.03.*) GCC_VERSION="11.2.0" ;;
-            23.05.*) GCC_VERSION="12.3.0" ;;
             *) GCC_VERSION="11.2.0" ;;
           esac
 
