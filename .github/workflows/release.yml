@@ -27,14 +27,14 @@ jobs:
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 2. 玩客云 / 32位 ARM (ARMv7 Little-Endian) - 修正为标准绝对存在的 19.07.10 armvirt/generic SDK
+          # 2. 玩客云 / 32位 ARM (ARMv7 Little-Endian - armvirt/32 官方通用 SDK)
           - {
               version: "19.07.10",
               arch: "armvirt",
-              subarch: "generic",
+              subarch: "32",
               pkg_arch: "arm_cortex-a15_neon-vfpv4",
             }
-          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64) - 22.03.5 armvirt/64 SDK
+          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64)
           - {
               version: "22.03.5",
               arch: "armvirt",
@@ -60,17 +60,23 @@ jobs:
           SDK_VERSION=${{ matrix.target.version }}
           SDK_ARCH=${{ matrix.target.arch }}
           SDK_SUBARCH=${{ matrix.target.subarch }}
+          BASE_URL="https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/"
 
-          case ${SDK_VERSION} in
-            19.07.*) GCC_VERSION="7.5.0" ;;
-            22.03.*) GCC_VERSION="11.2.0" ;;
-            *) GCC_VERSION="11.2.0" ;;
-          esac
+          echo "Fetching SDK list from ${BASE_URL}..."
+          
+          # 动态匹配页面中真正的 SDK 文件名（解析 HTML 索引）
+          SDK_FILE=$(curl -sL ${BASE_URL} | grep -oE 'openwrt-sdk-[^"]+\.tar\.(xz|bz2)' | head -n 1)
 
-          SDK_URL="https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.xz"
+          if [ -z "$SDK_FILE" ]; then
+            echo "Error: Could not find SDK package at ${BASE_URL}"
+            exit 1
+          fi
+
+          SDK_URL="${BASE_URL}${SDK_FILE}"
           echo "Downloading SDK from ${SDK_URL}"
-          wget -q ${SDK_URL} -O openwrt-sdk.tar.xz || wget -q https://downloads.openwrt.org/releases/${SDK_VERSION}/targets/${SDK_ARCH}/${SDK_SUBARCH}/openwrt-sdk-${SDK_VERSION}-${SDK_ARCH}-${SDK_SUBARCH}_gcc-${GCC_VERSION}_musl.Linux-x86_64.tar.bz2 -O openwrt-sdk.tar.xz
-          tar -xf openwrt-sdk.tar.xz
+          
+          wget -q ${SDK_URL} -O openwrt-sdk.tar.xz || wget -q ${SDK_URL} -O openwrt-sdk.tar.bz2
+          tar -xf openwrt-sdk.tar.*
           mv openwrt-sdk-* openwrt-sdk
           echo "WORK_DIR=$(pwd)/openwrt-sdk" >> $GITHUB_ENV
 
