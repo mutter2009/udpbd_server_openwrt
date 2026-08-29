@@ -34,11 +34,11 @@ jobs:
               subarch: "meson8b",
               pkg_arch: "arm_cortex-a5_vfpv4",
             }
-          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64)
+          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64) - 修复为 armvirt/64 SDK
           - {
               version: "22.03.5",
-              arch: "armsr",
-              subarch: "armv8",
+              arch: "armvirt",
+              subarch: "64",
               pkg_arch: "aarch64_generic",
             }
 
