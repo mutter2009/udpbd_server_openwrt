@@ -11,6 +11,7 @@ define Package/udpbd-server
 	CATEGORY:=Network
 	TITLE:=UDP Block Device Server (Multi-Arch Fixed)
 	DEPENDS:=
+	PKGARCH:=all
 endef
 
 define Package/udpbd-server/description
