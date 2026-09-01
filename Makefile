@@ -19,10 +19,16 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || true
+	$(CP) ./* $(PKG_BUILD_DIR)/ 2>/dev/null || true
+endef
+
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
-		$$(find $(PKG_BUILD_DIR) -type f -name "*.c")
+		`find $(PKG_BUILD_DIR) -name "*.c"`
 endef
 
 define Package/udpbd-server/install
