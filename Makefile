@@ -19,11 +19,8 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
-# 关键：针对 Cortex-A5 / S805 芯片精细调整 CPU 指令编译选项（禁用 NEON，防止 Illegal instruction）
-TARGET_CFLAGS += -mcpu=cortex-a5 -mfpu=vfpv4-d16 -mfloat-abi=hard -marm
-
 define Build/Compile
-	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/udpbd-server src/main.c
+	$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/udpbd-server src/main.c
 endef
 
 define Package/udpbd-server/install
