@@ -19,7 +19,7 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
-# 1. 自动把仓库里的代码复制到编译目录 (无论代码在 ./ 还是 ./src)
+# 显式定义准备阶段：确保源码安全拷贝到编译目录
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
 	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || true
@@ -27,10 +27,14 @@ define Build/Prepare
 	$(CP) ./*.h $(PKG_BUILD_DIR)/ 2>/dev/null || true
 endef
 
-# 2. 进到编译目录执行 Shell 命令，让 Linux Shell 在运行时自动展开 *.c
+# 编译阶段：通过 wildcard 动态捕获所有源文件，彻底杜绝 *.c 变成字符串字面量
 define Build/Compile
-	cd $(PKG_BUILD_DIR) && $(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
-		-o udpbd-server *.c
+	$(if $(wildcard $(PKG_BUILD_DIR)/*.c), \
+		$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
+			-o $(PKG_BUILD_DIR)/udpbd-server \
+			$(wildcard $(PKG_BUILD_DIR)/*.c), \
+		$(error No C source files found in $(PKG_BUILD_DIR)) \
+	)
 endef
 
 define Package/udpbd-server/install
