@@ -91,6 +91,11 @@ jobs:
         run: |
           cd ${{ env.WORK_DIR }}
 
+          # 1. 强制启用该包并刷新配置（非交互模式）
+          echo "CONFIG_PACKAGE_udpbd-server=y" > .config
+          make defconfig
+
+          # 2. 执行编译
           make package/udpbd-server/compile EXTRA_CFLAGS="${{ matrix.target.extra_cflags }}" V=s
 
           mkdir -p release_files
