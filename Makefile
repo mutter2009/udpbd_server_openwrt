@@ -19,6 +19,7 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
+# OpenWrt SDK 会自动把 ./src 目录拷贝到 $(PKG_BUILD_DIR)
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
