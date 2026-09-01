@@ -20,14 +20,9 @@ define Package/udpbd-server/description
 endef
 
 define Build/Compile
-	# 确保创建编译路径
-	$(INSTALL_DIR) $(PKG_BUILD_DIR)
-	# 从 package 源码位置直接强制拷贝所有源文件到编译目录
-	cp -rf $(PKG_BUILD_DIR)/../* $(PKG_BUILD_DIR)/ 2>/dev/null || true
-	# 编译源文件
 	$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
-		$$(find $(PKG_BUILD_DIR) -maxdepth 2 -name "*.c")
+		$(PKG_BUILD_DIR)/*.c
 endef
 
 define Package/udpbd-server/install
