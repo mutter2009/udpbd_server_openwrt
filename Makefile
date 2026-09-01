@@ -7,44 +7,28 @@ PKG_RELEASE:=1
 include $(INCLUDE_DIR)/package.mk
 
 define Package/udpbd-server
-	SECTION:=net
-	CATEGORY:=Network
-	TITLE:=UDP Block Device Server (Multi-Arch Fixed)
-	DEPENDS:=
-	DEFAULT_DEPENDS:=
-	PKG_ARCH:=all
+  SECTION:=net
+  CATEGORY:=Network
+  TITLE:=UDP Block Device Server
+  DEPENDS:=
+  DEFAULT_DEPENDS:=
+  PKG_ARCH:=all
 endef
 
 define Package/udpbd-server/description
-	UDP Block Device (UDPBD) server with Bit-field endianness fixes for OpenWrt & Armbian.
+  UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || $(CP) ./* $(PKG_BUILD_DIR)/ 2>/dev/null || true
-endef
-
-define Build/Configure
-endef
+# 关键：针对 Cortex-A5 / S805 芯片精细调整 CPU 指令编译选项（禁用 NEON，防止 Illegal instruction）
+TARGET_CFLAGS += -mcpu=cortex-a5 -mfpu=vfpv4-d16 -mfloat-abi=hard -marm
 
 define Build/Compile
-	$(TARGET_CXX) $(TARGET_CXXFLAGS) $(TARGET_CPPFLAGS) \
-		-D_GNU_SOURCE \
-		-I$(PKG_BUILD_DIR) \
-		-o $(PKG_BUILD_DIR)/udpbd-server \
-		$(PKG_BUILD_DIR)/main.cpp \
-		$(TARGET_LDFLAGS) -static-libstdc++ -static-libgcc -lgcc_eh
+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/udpbd-server src/main.c
 endef
 
 define Package/udpbd-server/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/udpbd-server $(1)/usr/bin/
-	
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/udpbd-server.init $(1)/etc/init.d/udpbd-server 2>/dev/null || true
-	
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/udpbd-server.config $(1)/etc/config/udpbd-server 2>/dev/null || true
 endef
 
 $(eval $(call BuildPackage,udpbd-server))
