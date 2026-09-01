@@ -27,19 +27,33 @@ jobs:
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 2. 玩客云 / 32位 ARM (ARMv7 Little-Endian - armvirt/32 官方通用 SDK)
+          # 2. 玩客云专有 32 位系统 (Cortex-A5 / Meson / S805 专用)
+          - {
+              version: "19.07.10",
+              arch: "meson",
+              subarch: "meson8b",
+              pkg_arch: "arm_cortex-a5_vfpv4",
+            }
+          # 3. 通用 32 位 ARM (ARMv7 - Cortex-A15)
           - {
               version: "19.07.10",
               arch: "armvirt",
               subarch: "32",
               pkg_arch: "arm_cortex-a15_neon-vfpv4",
             }
-          # 3. 玩客云 / 电视盒子 64位系统 (ARM64 / AArch64)
+          # 4. 玩客云 / 电视盒子 64 位系统 (ARM64 / AArch64)
           - {
               version: "22.03.5",
               arch: "armvirt",
               subarch: "64",
               pkg_arch: "aarch64_generic",
+            }
+          # 5. x86_64 软路由 / 工控机 / 虚拟机 (64-bit Intel/AMD)
+          - {
+              version: "22.03.5",
+              arch: "x86",
+              subarch: "64",
+              pkg_arch: "x86_64",
             }
 
     steps:
@@ -64,7 +78,7 @@ jobs:
 
           echo "Fetching SDK list from ${BASE_URL}..."
           
-          # 动态匹配页面中真正的 SDK 文件名（解析 HTML 索引）
+          # 动态匹配页面中真正的 SDK 文件名
           SDK_FILE=$(curl -sL ${BASE_URL} | grep -oE 'openwrt-sdk-[^"]+\.tar\.(xz|bz2)' | head -n 1)
 
           if [ -z "$SDK_FILE" ]; then
