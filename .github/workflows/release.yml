@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         target:
-          # 1. 玩客云专有 32 位系统 (Cortex-A5 - 注入防 Illegal Instruction 编译参数)
+          # 1. 玩客云 32 位系统 (Cortex-A5 - 注入防 Illegal Instruction 参数)
           - {
               version: "19.07.10",
               arch: "armvirt",
@@ -28,15 +28,7 @@ jobs:
               pkg_arch: "arm_cortex-a5_vfpv4",
               extra_cflags: "-mcpu=cortex-a5 -mfpu=vfpv4-d16 -mfloat-abi=hard -marm",
             }
-          # 2. 通用 32 位 ARM (如小米 R2D - Cortex-A15/A9)
-          - {
-              version: "19.07.10",
-              arch: "armvirt",
-              subarch: "32",
-              pkg_arch: "arm_cortex-a15_neon-vfpv4",
-              extra_cflags: "",
-            }
-          # 3. 玩客云 / 电视盒子 64 位系统 (ARM64 / AArch64)
+          # 2. 玩客云 / 电视盒子 64 位系统 (ARM64 / AArch64)
           - {
               version: "22.03.5",
               arch: "armvirt",
@@ -44,7 +36,7 @@ jobs:
               pkg_arch: "aarch64_generic",
               extra_cflags: "",
             }
-          # 4. x86_64 软路由 / 工控机 / 虚拟机 (64-bit Intel/AMD)
+          # 3. x86_64 软路由 / 工控机 / 虚拟机 (64-bit Intel/AMD)
           - {
               version: "22.03.5",
               arch: "x86",
