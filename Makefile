@@ -10,7 +10,6 @@ define Package/udpbd-server
   SECTION:=net
   CATEGORY:=Network
   TITLE:=UDP Block Device Server
-  # C++ 程序在 OpenWrt 中通常需要依赖 libstdcpp
   DEPENDS:=+libstdcpp
   DEFAULT_DEPENDS:=
   PKG_ARCH:=all
@@ -22,17 +21,20 @@ endef
 
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
-	# 如果 SDK 的 package 目录存有源码，直接复制过去
+	# 兼容处理：无论源码在根目录、src 目录还是 package 目录，全部安全复制到编译区
 	if [ -d "$(TOPDIR)/package/udpbd-server" ]; then \
 		cp -r $(TOPDIR)/package/udpbd-server/* $(PKG_BUILD_DIR)/ 2>/dev/null || true; \
 	fi
-	# 将深层的 .cpp 和 .h 提升到构建根目录
+	# 如果存在 src 子目录，也将其内容复制过去
+	if [ -d "$(PKG_BUILD_DIR)/src" ]; then \
+		cp -r $(PKG_BUILD_DIR)/src/* $(PKG_BUILD_DIR)/ 2>/dev/null || true; \
+	fi
+	# 强力平铺：把所有深层目录下的 .cpp 和 .h 提拔到编译根目录
 	find $(PKG_BUILD_DIR) -mindepth 2 -name "*.cpp" -exec cp {} $(PKG_BUILD_DIR)/ \; 2>/dev/null || true
 	find $(PKG_BUILD_DIR) -mindepth 2 -name "*.h" -exec cp {} $(PKG_BUILD_DIR)/ \; 2>/dev/null || true
 endef
 
 define Build/Compile
-	# 检查 .cpp 文件，并使用 CXX 编译器
 	$(if $(wildcard $(PKG_BUILD_DIR)/*.cpp), \
 		$(TARGET_CXX) $(TARGET_CXXFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 			-o $(PKG_BUILD_DIR)/udpbd-server \
