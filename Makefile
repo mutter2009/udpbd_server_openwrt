@@ -22,7 +22,7 @@ endef
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 		-o $(PKG_BUILD_DIR)/udpbd-server \
-		$(firstword $(wildcard $(PKG_BUILD_DIR)/src/main.c $(PKG_BUILD_DIR)/main.c))
+		$(wildcard $(PKG_BUILD_DIR)/*.c $(PKG_BUILD_DIR)/src/*.c)
 endef
 
 define Package/udpbd-server/install
