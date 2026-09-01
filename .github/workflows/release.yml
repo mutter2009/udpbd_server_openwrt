@@ -20,21 +20,21 @@ jobs:
     strategy:
       matrix:
         target:
-          # 1. 品胜经典大端路由器 (MIPS Big-Endian)
+          # 1. 品胜经典大端路由器 (MIPS Big-Endian - AR9331 等)
           - {
               version: "19.07.10",
               arch: "ar71xx",
               subarch: "generic",
               pkg_arch: "mips_24kc",
             }
-          # 2. 玩客云专有 32 位系统 (Cortex-A5 - 采用 ARM32 SDK 编译并重定向架构名)
+          # 2. 玩客云专有 32 位系统 (Cortex-A5 - 借用 ARM32 SDK 编译并注入 A5 架构名)
           - {
               version: "19.07.10",
               arch: "armvirt",
               subarch: "32",
               pkg_arch: "arm_cortex-a5_vfpv4",
             }
-          # 3. 通用 32 位 ARM (ARMv7 - Cortex-A15)
+          # 3. 通用 32 位 ARM (如小米 R2D - Cortex-A15/A9)
           - {
               version: "19.07.10",
               arch: "armvirt",
@@ -101,37 +101,27 @@ jobs:
         id: compile
         run: |
           cd ${{ env.WORK_DIR }}
+
+          # 在编译前动态向 Makefile 注入 PKG_ARCH，解决玩客云等特殊固件架构校验问题
+          if [ -n "${{ matrix.target.pkg_arch }}" ]; then
+            sed -i '/PKG_NAME:=/a PKG_ARCH:=${{ matrix.target.pkg_arch }}' package/udpbd-server/Makefile || true
+          fi
+
           make defconfig
           make package/udpbd-server/compile V=s
 
-          IPK_PATH=$(find bin/packages -type f -name "udpbd-server_*.ipk" | head -n 1)
+          # 创建发布文件存储目录
+          mkdir -p release_files
+
+          IPK_PATH=$(find bin/packages -type f -name "*.ipk" | head -n 1)
           BIN_PATH=$(find build_dir -type f -name "udpbd-server" | head -n 1)
 
-          mkdir -p release_files
-          
-          # 解包 IPK 并修改 control 文件中的 Architecture 字段为目标架构名
-          ORIGINAL_IPK="${IPK_PATH}"
-          TARGET_ARCH="${{ matrix.target.pkg_arch }}"
-          
-          mkdir -p /tmp/ipk_unpack
-          tar -C /tmp/ipk_unpack -xzf ${ORIGINAL_IPK}
-          mkdir -p /tmp/ipk_unpack/control_dir
-          tar -C /tmp/ipk_unpack/control_dir -xzf /tmp/ipk_unpack/control.tar.gz
-          
-          # 替换架构标签
-          sed -i "s/^Architecture:.*/Architecture: ${TARGET_ARCH}/" /tmp/ipk_unpack/control_dir/control
-          
-          # 重新打包 control.tar.gz
-          (cd /tmp/ipk_unpack/control_dir && tar -czf ../control.tar.gz .)
-          rm -rf /tmp/ipk_unpack/control_dir
-          
-          # 重新生成 IPK 包
-          NEW_IPK_NAME="udpbd-server_1.0-1_${TARGET_ARCH}.ipk"
-          (cd /tmp/ipk_unpack && tar -czf release_files/${NEW_IPK_NAME} control.tar.gz data.tar.gz debian-binary)
-          mv /tmp/ipk_unpack/release_files/${NEW_IPK_NAME} release_files/
-          
+          if [ -n "$IPK_PATH" ]; then
+            cp ${IPK_PATH} release_files/udpbd-server_${{ matrix.target.pkg_arch }}.ipk
+          fi
+
           if [ -f "$BIN_PATH" ]; then
-            cp ${BIN_PATH} release_files/udpbd-server_${TARGET_ARCH}
+            cp ${BIN_PATH} release_files/udpbd-server_${{ matrix.target.pkg_arch }}
           fi
 
       - name: Upload Artifacts
