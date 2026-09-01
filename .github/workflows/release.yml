@@ -83,33 +83,17 @@ jobs:
 
       - name: Install package sources into SDK
         run: |
-          # 复制包源码到 SDK 的 package 目录
           mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
           cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
 
       - name: Compile the package
         id: compile
+        env:
+          TERM: xterm
         run: |
           cd ${{ env.WORK_DIR }}
 
-          # 1. 运行 prepare 强行生成 target 目录结构
-          make package/udpbd-server/prepare V=s || true
-
-          # 2. 精准定位 OpenWrt SDK 生成的构建目标路径
-          TARGET_BUILD_DIR=$(find build_dir -type d -name "udpbd-server-1.0" 2>/dev/null | head -n 1)
-          if [ -z "$TARGET_BUILD_DIR" ]; then
-            TARGET_DIR=$(find build_dir -type d -name "target-*" | head -n 1)
-            TARGET_BUILD_DIR="${TARGET_DIR}/udpbd-server-1.0"
-          fi
-
-          # 3. 强制把你的项目文件（包括 .c 源码）注入到 SDK 编译路径中
-          mkdir -p "$TARGET_BUILD_DIR"
-          cp -rf $GITHUB_WORKSPACE/* "$TARGET_BUILD_DIR/"
-          if [ -d "$GITHUB_WORKSPACE/src" ]; then
-            cp -rf $GITHUB_WORKSPACE/src/* "$TARGET_BUILD_DIR/"
-          fi
-
-          # 4. 执行正式编译
+          make defconfig
           make package/udpbd-server/compile EXTRA_CFLAGS="${{ matrix.target.extra_cflags }}" V=s
 
           mkdir -p release_files
