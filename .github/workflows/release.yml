@@ -36,7 +36,7 @@ jobs:
               pkg_arch: "aarch64_generic",
               extra_cflags: "",
             }
-          # 3. x86_64 软路由 / 工工机 / 虚拟机 (64-bit Intel/AMD)
+          # 3. x86_64 软路由 / 工控机 / 虚拟机 (64-bit Intel/AMD)
           - {
               version: "22.03.5",
               arch: "x86",
@@ -83,18 +83,8 @@ jobs:
 
       - name: Install package sources into SDK
         run: |
-          PKG_DIR="${{ env.WORK_DIR }}/package/udpbd-server"
-          mkdir -p "$PKG_DIR"
-          
-          # 1. 复制整个仓库到 package 目录
-          cp -r $GITHUB_WORKSPACE/* "$PKG_DIR/"
-          
-          # 2. 强力平铺：把所有子目录下藏着的 .c 和 .h 文件全部统统提拔到 package/udpbd-server 根目录
-          find "$PKG_DIR" -mindepth 2 -name "*.c" -exec cp {} "$PKG_DIR/" \;
-          find "$PKG_DIR" -mindepth 2 -name "*.h" -exec cp {} "$PKG_DIR/" \;
-          
-          echo "=== 检查复制后的源码文件列表 ==="
-          ls -la "$PKG_DIR"
+          mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
+          cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
 
       - name: Compile the package
         id: compile
