@@ -19,14 +19,14 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
-define Build/Prepare
+define Build/Compile
+	# 1. 确保构建目录存在
 	mkdir -p $(PKG_BUILD_DIR)
+	# 2. 强制把 package 目录下的所有源文件复制到 PKG_BUILD_DIR
 	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || true
 	$(CP) ./*.c $(PKG_BUILD_DIR)/ 2>/dev/null || true
 	$(CP) ./*.h $(PKG_BUILD_DIR)/ 2>/dev/null || true
-endef
-
-define Build/Compile
+	# 3. 进入 PKG_BUILD_DIR 目录并执行编译
 	cd $(PKG_BUILD_DIR) && $(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 		-o udpbd-server *.c
 endef
