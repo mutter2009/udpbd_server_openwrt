@@ -20,15 +20,14 @@ define Package/udpbd-server/description
 endef
 
 define Build/Compile
-	# 1. 确保构建目录存在
-	mkdir -p $(PKG_BUILD_DIR)
-	# 2. 强制把 package 目录下的所有源文件复制到 PKG_BUILD_DIR
-	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || true
-	$(CP) ./*.c $(PKG_BUILD_DIR)/ 2>/dev/null || true
-	$(CP) ./*.h $(PKG_BUILD_DIR)/ 2>/dev/null || true
-	# 3. 进入 PKG_BUILD_DIR 目录并执行编译
-	cd $(PKG_BUILD_DIR) && $(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
-		-o udpbd-server *.c
+	# 确保创建编译路径
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)
+	# 从 package 源码位置直接强制拷贝所有源文件到编译目录
+	cp -rf $(PKG_BUILD_DIR)/../* $(PKG_BUILD_DIR)/ 2>/dev/null || true
+	# 编译源文件
+	$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
+		-o $(PKG_BUILD_DIR)/udpbd-server \
+		$$(find $(PKG_BUILD_DIR) -maxdepth 2 -name "*.c")
 endef
 
 define Package/udpbd-server/install
