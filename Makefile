@@ -19,21 +19,23 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
-# 显式定义准备阶段：确保源码安全拷贝到编译目录
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) ./src/* $(PKG_BUILD_DIR)/ 2>/dev/null || true
+	# 穷举所有可能的源文件存放路径进行复制，确保万无一失
+	[ -d ./src ] && $(CP) ./src/* $(PKG_BUILD_DIR)/ || true
 	$(CP) ./*.c $(PKG_BUILD_DIR)/ 2>/dev/null || true
 	$(CP) ./*.h $(PKG_BUILD_DIR)/ 2>/dev/null || true
+	# 如果在 SDK 外部，尝试从 package 目录反向复制
+	[ -d $(TOPDIR)/package/udpbd-server/src ] && $(CP) $(TOPDIR)/package/udpbd-server/src/* $(PKG_BUILD_DIR)/ || true
+	$(CP) $(TOPDIR)/package/udpbd-server/*.c $(PKG_BUILD_DIR)/ 2>/dev/null || true
 endef
 
-# 编译阶段：通过 wildcard 动态捕获所有源文件，彻底杜绝 *.c 变成字符串字面量
 define Build/Compile
 	$(if $(wildcard $(PKG_BUILD_DIR)/*.c), \
 		$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 			-o $(PKG_BUILD_DIR)/udpbd-server \
 			$(wildcard $(PKG_BUILD_DIR)/*.c), \
-		$(error No C source files found in $(PKG_BUILD_DIR)) \
+		$(error No C source files found in $(PKG_BUILD_DIR). Please check your source file locations.) \
 	)
 endef
 
