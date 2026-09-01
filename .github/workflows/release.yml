@@ -83,8 +83,17 @@ jobs:
 
       - name: Install package sources into SDK
         run: |
-          mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
-          cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
+          PKG_DIR="${{ env.WORK_DIR }}/package/udpbd-server"
+          mkdir -p "$PKG_DIR"
+          
+          cp -r $GITHUB_WORKSPACE/* "$PKG_DIR/"
+          
+          # 这里改为提取 .cpp 文件
+          find "$PKG_DIR" -mindepth 2 -name "*.cpp" -exec cp {} "$PKG_DIR/" \;
+          find "$PKG_DIR" -mindepth 2 -name "*.h" -exec cp {} "$PKG_DIR/" \;
+          
+          echo "=== 检查复制后的源码文件列表 ==="
+          ls -la "$PKG_DIR"
 
       - name: Compile the package
         id: compile
