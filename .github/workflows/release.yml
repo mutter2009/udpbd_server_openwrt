@@ -20,40 +20,37 @@ jobs:
     strategy:
       matrix:
         target:
-          # 1. 品胜经典大端路由器 (MIPS Big-Endian - AR9331 等)
-          - {
-              version: "19.07.10",
-              arch: "ar71xx",
-              subarch: "generic",
-              pkg_arch: "mips_24kc",
-            }
-          # 2. 玩客云专有 32 位系统 (Cortex-A5 - 借用 ARM32 SDK 编译并注入 A5 架构名)
+          # 1. 玩客云专有 32 位系统 (Cortex-A5 - 注入防 Illegal Instruction 编译参数)
           - {
               version: "19.07.10",
               arch: "armvirt",
               subarch: "32",
               pkg_arch: "arm_cortex-a5_vfpv4",
+              extra_cflags: "-mcpu=cortex-a5 -mfpu=vfpv4-d16 -mfloat-abi=hard -marm",
             }
-          # 3. 通用 32 位 ARM (如小米 R2D - Cortex-A15/A9)
+          # 2. 通用 32 位 ARM (如小米 R2D - Cortex-A15/A9)
           - {
               version: "19.07.10",
               arch: "armvirt",
               subarch: "32",
               pkg_arch: "arm_cortex-a15_neon-vfpv4",
+              extra_cflags: "",
             }
-          # 4. 玩客云 / 电视盒子 64 位系统 (ARM64 / AArch64)
+          # 3. 玩客云 / 电视盒子 64 位系统 (ARM64 / AArch64)
           - {
               version: "22.03.5",
               arch: "armvirt",
               subarch: "64",
               pkg_arch: "aarch64_generic",
+              extra_cflags: "",
             }
-          # 5. x86_64 软路由 / 工控机 / 虚拟机 (64-bit Intel/AMD)
+          # 4. x86_64 软路由 / 工控机 / 虚拟机 (64-bit Intel/AMD)
           - {
               version: "22.03.5",
               arch: "x86",
               subarch: "64",
               pkg_arch: "x86_64",
+              extra_cflags: "",
             }
 
     steps:
@@ -102,15 +99,9 @@ jobs:
         run: |
           cd ${{ env.WORK_DIR }}
 
-          # 在编译前动态向 Makefile 注入 PKG_ARCH，解决玩客云等特殊固件架构校验问题
-          if [ -n "${{ matrix.target.pkg_arch }}" ]; then
-            sed -i '/PKG_NAME:=/a PKG_ARCH:=${{ matrix.target.pkg_arch }}' package/udpbd-server/Makefile || true
-          fi
-
           make defconfig
-          make package/udpbd-server/compile V=s
+          make package/udpbd-server/compile EXTRA_CFLAGS="${{ matrix.target.extra_cflags }}" V=s
 
-          # 创建发布文件存储目录
           mkdir -p release_files
 
           IPK_PATH=$(find bin/packages -type f -name "*.ipk" | head -n 1)
