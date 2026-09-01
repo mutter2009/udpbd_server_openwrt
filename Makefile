@@ -19,15 +19,16 @@ define Package/udpbd-server/description
   UDP Block Device (UDPBD) server for OpenWrt.
 endef
 
+# 核心修复：重写 Build/Prepare，从上级 package 目录或源码位置把文件安全拷贝过来
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
-	# 穷举所有可能的源文件存放路径进行复制，确保万无一失
-	[ -d ./src ] && $(CP) ./src/* $(PKG_BUILD_DIR)/ || true
-	$(CP) ./*.c $(PKG_BUILD_DIR)/ 2>/dev/null || true
-	$(CP) ./*.h $(PKG_BUILD_DIR)/ 2>/dev/null || true
-	# 如果在 SDK 外部，尝试从 package 目录反向复制
-	[ -d $(TOPDIR)/package/udpbd-server/src ] && $(CP) $(TOPDIR)/package/udpbd-server/src/* $(PKG_BUILD_DIR)/ || true
-	$(CP) $(TOPDIR)/package/udpbd-server/*.c $(PKG_BUILD_DIR)/ 2>/dev/null || true
+	# 如果 SDK 的 package 目录存有源码，直接复制过去
+	if [ -d "$(TOPDIR)/package/udpbd-server" ]; then \
+		cp -r $(TOPDIR)/package/udpbd-server/* $(PKG_BUILD_DIR)/ 2>/dev/null || true; \
+	fi
+	# 防止有嵌套目录，把深层的 .c 和 .h 提升到构建根目录
+	find $(PKG_BUILD_DIR) -mindepth 2 -name "*.c" -exec cp {} $(PKG_BUILD_DIR)/ \; 2>/dev/null || true
+	find $(PKG_BUILD_DIR) -mindepth 2 -name "*.h" -exec cp {} $(PKG_BUILD_DIR)/ \; 2>/dev/null || true
 endef
 
 define Build/Compile
@@ -35,7 +36,7 @@ define Build/Compile
 		$(TARGET_CC) $(TARGET_CFLAGS) $(EXTRA_CFLAGS) $(TARGET_LDFLAGS) \
 			-o $(PKG_BUILD_DIR)/udpbd-server \
 			$(wildcard $(PKG_BUILD_DIR)/*.c), \
-		$(error No C source files found in $(PKG_BUILD_DIR). Please check your source file locations.) \
+		$(error No C source files found in $(PKG_BUILD_DIR)) \
 	)
 endef
 
