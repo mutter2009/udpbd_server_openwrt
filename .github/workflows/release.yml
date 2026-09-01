@@ -83,7 +83,6 @@ jobs:
 
       - name: Install package sources into SDK
         run: |
-          # 建立包源码目录
           mkdir -p ${{ env.WORK_DIR }}/package/udpbd-server
           cp -r $GITHUB_WORKSPACE/* ${{ env.WORK_DIR }}/package/udpbd-server/
 
@@ -91,15 +90,6 @@ jobs:
         id: compile
         run: |
           cd ${{ env.WORK_DIR }}
-
-          # 关键修复：提前创建 SDK 编译目录并把 C 代码放进去
-          BUILD_DIR_TARGET=$(find build_dir -type d -name "udpbd-server-1.0" 2>/dev/null | head -n 1)
-          if [ -z "$BUILD_DIR_TARGET" ]; then
-            # 如果目录还没生成，手动根据架构路径创建
-            BUILD_DIR_TARGET=$(find build_dir -type d -name "target-*" | head -n 1)/udpbd-server-1.0
-          fi
-          mkdir -p "$BUILD_DIR_TARGET"
-          cp -r $GITHUB_WORKSPACE/* "$BUILD_DIR_TARGET/"
 
           make defconfig
           make package/udpbd-server/compile EXTRA_CFLAGS="${{ matrix.target.extra_cflags }}" V=s
